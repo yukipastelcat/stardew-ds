@@ -1,0 +1,6 @@
+[submodule "mod"]
+	path = mod
+	url = git@github.com:yukipastelcat/stardew-ds-mod.git
+[submodule "companion"]
+	path = companion
+	url = git@github.com:yukipastelcat/stardew-ds-companion.git

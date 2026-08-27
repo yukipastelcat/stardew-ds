@@ -1,0 +1,104 @@
+name: Build release artifacts
+
+# Runs when a GitHub Release is published, builds the SMAPI mod zip and the
+# companion app's Android APK, and attaches both to that release.
+#
+# One-time setup required (see mod/README.md#ci-builds for details):
+#   - STARDEW_GAME_ASSEMBLIES_B64  (required) base64 of a tar.gz containing the
+#     Stardew Valley / SMAPI DLLs the mod build needs to compile against.
+#   - SUBMODULES_TOKEN             (only if the mod/companion repos are private)
+#     a PAT with repo read access, so actions/checkout can fetch the submodules.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-mod:
+    name: Build mod zip
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Check required secret
+        run: |
+          if [ -z "${{ secrets.STARDEW_GAME_ASSEMBLIES_B64 }}" ]; then
+            echo "::error::STARDEW_GAME_ASSEMBLIES_B64 repo secret is not set. See mod/README.md#ci-builds for how to generate it."
+            exit 1
+          fi
+
+      - name: Restore game reference assemblies
+        run: |
+          mkdir -p "$RUNNER_TEMP/stardew-game"
+          echo "${{ secrets.STARDEW_GAME_ASSEMBLIES_B64 }}" | base64 -d > "$RUNNER_TEMP/game-assemblies.tar.gz"
+          tar -xzf "$RUNNER_TEMP/game-assemblies.tar.gz" -C "$RUNNER_TEMP/stardew-game"
+          echo "GAME_PATH=$RUNNER_TEMP/stardew-game" >> "$GITHUB_ENV"
+
+      - name: Build mod (produces the release zip via ModBuildConfig)
+        run: dotnet build mod/StardewDS.csproj -c Release "/p:GamePath=${{ env.GAME_PATH }}"
+
+      - name: Locate built zip
+        id: modzip
+        run: |
+          zip_path=$(ls mod/bin/Release/net6.0/*.zip | head -n1)
+          if [ -z "$zip_path" ]; then
+            echo "::error::No mod zip found under mod/bin/Release/net6.0/ — check EnableModZip in StardewDS.csproj."
+            exit 1
+          fi
+          echo "path=$zip_path" >> "$GITHUB_OUTPUT"
+
+      - name: Upload zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.modzip.outputs.path }}" --clobber
+
+  build-companion:
+    name: Build companion Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build APK
+        working-directory: companion
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp companion/build/app/outputs/flutter-apk/app-release.apk "out/stardew-ds-companion-${{ github.event.release.tag_name }}.apk"
+
+      - name: Upload APK to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "out/stardew-ds-companion-${{ github.event.release.tag_name }}.apk" --clobber
