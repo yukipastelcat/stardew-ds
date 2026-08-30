@@ -1,0 +1,79 @@
+name: Release
+
+# Manually triggered. Pins the mod/ and companion/ submodules to the given
+# (or latest) release tags of stardew-ds-mod and stardew-ds-companion,
+# commits that pointer update, downloads the already-built artifacts from
+# those two submodule releases, and publishes a stardew-ds GitHub Release
+# at that commit with both artifacts attached.
+#
+# Requires SUBMODULES_TOKEN: a PAT with contents:write on stardew-ds-mod and
+# stardew-ds-companion (to read their releases cross-repo - GITHUB_TOKEN
+# can't reach outside this repo) and on stardew-ds itself (to push the
+# submodule-pointer commit).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version for stardew-ds (e.g. 1.3.0)'
+        required: true
+      mod_version:
+        description: 'mod version to pull in (e.g. 1.2.0). Leave blank to use the latest mod release.'
+        required: false
+      companion_version:
+        description: 'companion version to pull in (e.g. 0.4.0). Leave blank to use the latest companion release.'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Pin submodules and release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN }}
+
+      - name: Resolve submodule versions
+        id: resolve
+        run: |
+          mod_v="${{ inputs.mod_version }}"
+          if [ -z "$mod_v" ]; then
+            mod_v=$(gh release view --repo yukipastelcat/stardew-ds-mod --json tagName -q .tagName | sed 's/^v//')
+          fi
+          comp_v="${{ inputs.companion_version }}"
+          if [ -z "$comp_v" ]; then
+            comp_v=$(gh release view --repo yukipastelcat/stardew-ds-companion --json tagName -q .tagName | sed 's/^v//')
+          fi
+          echo "mod_tag=v$mod_v" >> "$GITHUB_OUTPUT"
+          echo "companion_tag=v$comp_v" >> "$GITHUB_OUTPUT"
+
+      - name: Download release artifacts
+        run: |
+          mkdir -p out
+          gh release download "${{ steps.resolve.outputs.mod_tag }}" --repo yukipastelcat/stardew-ds-mod -D out --pattern '*.zip'
+          gh release download "${{ steps.resolve.outputs.companion_tag }}" --repo yukipastelcat/stardew-ds-companion -D out --pattern '*.apk'
+
+      - name: Pin submodules to released commits
+        run: |
+          cd mod && git fetch --tags && git checkout "${{ steps.resolve.outputs.mod_tag }}" && cd ..
+          cd companion && git fetch --tags && git checkout "${{ steps.resolve.outputs.companion_tag }}" && cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add mod companion
+          git commit -m "release: v${{ inputs.version }} (mod ${{ steps.resolve.outputs.mod_tag }}, companion ${{ steps.resolve.outputs.companion_tag }})"
+          git push
+
+      - name: Create release
+        run: |
+          gh release create "v${{ inputs.version }}" out/*.zip out/*.apk \
+            --target "$(git rev-parse HEAD)" \
+            --title "v${{ inputs.version }}" \
+            --notes "mod: ${{ steps.resolve.outputs.mod_tag }}
+          companion: ${{ steps.resolve.outputs.companion_tag }}"
