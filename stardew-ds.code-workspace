@@ -5,6 +5,196 @@
 		},
 		{
 			"path": "mod"
+		},
+		{
+			"path": "game-refs"
 		}
-	]
+	],
+	"settings": {
+		// Debug only user code — don't drop the debugger into Dart SDK or
+		// Flutter-framework internals. Keeps the "Exception has occurred"
+		// pane from stopping on framework-internal throws (notably the
+		// Flutter-web widget-inspector's own debugTransformDebugCreator
+		// crash — flutter/flutter#170572 — which is a display bug, not an
+		// app bug).
+		"dart.debugSdkLibraries": false,
+		"dart.debugExternalPackageLibraries": false
+	},
+	"extensions": {
+		"recommendations": [
+			"Dart-Code.dart-code",
+			"Dart-Code.flutter",
+			"ms-dotnettools.csharp"
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "companion: launch (debug)",
+				"type": "dart",
+				"request": "launch",
+				"program": "lib/main.dart",
+				"cwd": "${workspaceFolder:companion}",
+				// --no-track-widget-creation drops the per-widget
+				// creation-location tracking that the Flutter-web widget
+				// inspector's debugTransformDebugCreator chokes on
+				// (throws "LegacyJavaScriptObject is not a subtype of
+				// DiagnosticsNode" while formatting *any* reported error,
+				// masking the real one — flutter/flutter#170572). Cost:
+				// the inspector's "jump to widget source" and the
+				// "relevant error-causing widget was:" hint in error
+				// messages stop working. Use "(debug, widget inspector)"
+				// below when you need those.
+				"toolArgs": ["--no-track-widget-creation"]
+			},
+			{
+				"name": "companion: launch (debug, widget inspector)",
+				"type": "dart",
+				"request": "launch",
+				"program": "lib/main.dart",
+				"cwd": "${workspaceFolder:companion}"
+			},
+			{
+				"name": "companion: launch (profile)",
+				"type": "dart",
+				"request": "launch",
+				"program": "lib/main.dart",
+				"cwd": "${workspaceFolder:companion}",
+				"flutterMode": "profile"
+			},
+			{
+				"name": "companion: launch (release)",
+				"type": "dart",
+				"request": "launch",
+				"program": "lib/main.dart",
+				"cwd": "${workspaceFolder:companion}",
+				"flutterMode": "release"
+			}
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "mod: restore",
+				"type": "shell",
+				"command": "dotnet",
+				"args": [
+					"restore",
+					"StardewDS.csproj"
+				],
+				"options": {
+					"cwd": "${workspaceFolder:mod}"
+				},
+				"presentation": {
+					"reveal": "silent",
+					"panel": "shared"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "mod: build (Debug)",
+				"type": "shell",
+				"command": "dotnet build StardewDS.csproj -c Debug \"/p:GamePath=${workspaceFolder:game-refs}/refs\" \"/p:ModZipPath=${workspaceFolder:mod}/../dist/mod/Debug\" /p:EnableModDeploy=false",
+				"options": {
+					"cwd": "${workspaceFolder:mod}"
+				},
+				"dependsOn": [
+					"mod: restore"
+				],
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "shared",
+					"clear": true
+				},
+				"problemMatcher": "$msCompile"
+			},
+			{
+				"label": "mod: build (Release)",
+				"type": "shell",
+				"command": "dotnet build StardewDS.csproj -c Release \"/p:GamePath=${workspaceFolder:game-refs}/refs\" \"/p:ModZipPath=${workspaceFolder:mod}/../dist/mod/Release\" /p:EnableModDeploy=false",
+				"options": {
+					"cwd": "${workspaceFolder:mod}"
+				},
+				"dependsOn": [
+					"mod: restore"
+				],
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "shared",
+					"clear": true
+				},
+				"problemMatcher": "$msCompile"
+			},
+			{
+				"label": "companion: pub get",
+				"type": "shell",
+				"command": "flutter",
+				"args": [
+					"pub",
+					"get"
+				],
+				"options": {
+					"cwd": "${workspaceFolder:companion}"
+				},
+				"presentation": {
+					"reveal": "silent",
+					"panel": "shared"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "companion: build apk (debug)",
+				"type": "shell",
+				"command": "mkdir -p \"${workspaceFolder:companion}/../dist/companion\" && flutter build apk --debug && cp \"${workspaceFolder:companion}/build/app/outputs/flutter-apk/app-debug.apk\" \"${workspaceFolder:companion}/../dist/companion/companion-debug.apk\"",
+				"options": {
+					"cwd": "${workspaceFolder:companion}"
+				},
+				"dependsOn": [
+					"companion: pub get"
+				],
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "shared",
+					"clear": true
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "companion: build apk (release)",
+				"type": "shell",
+				"command": "mkdir -p \"${workspaceFolder:companion}/../dist/companion\" && flutter build apk --release && cp \"${workspaceFolder:companion}/build/app/outputs/flutter-apk/app-release.apk\" \"${workspaceFolder:companion}/../dist/companion/companion-release.apk\"",
+				"options": {
+					"cwd": "${workspaceFolder:companion}"
+				},
+				"dependsOn": [
+					"companion: pub get"
+				],
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "shared",
+					"clear": true
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Build All (mod + companion, Release)",
+				"dependsOn": [
+					"mod: build (Release)",
+					"companion: build apk (release)"
+				],
+				"dependsOrder": "sequence",
+				"group": {
+					"kind": "build",
+					"isDefault": true
+				},
+				"problemMatcher": []
+			}
+		]
+	}
 }
