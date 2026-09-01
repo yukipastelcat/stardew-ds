@@ -93,7 +93,7 @@
 			{
 				"label": "mod: build (Debug)",
 				"type": "shell",
-				"command": "dotnet build StardewDS.csproj -c Debug \"/p:GamePath=${workspaceFolder:game-refs}/refs\" \"/p:ModZipPath=${workspaceFolder:mod}/../dist/mod/Debug\" /p:EnableModDeploy=false",
+				"command": "dotnet build StardewDS.csproj -c Debug \"/p:GamePath=${workspaceFolder:mod}/vendor/lib\" /p:EnableModDeploy=false",
 				"options": {
 					"cwd": "${workspaceFolder:mod}"
 				},
@@ -111,7 +111,7 @@
 			{
 				"label": "mod: build (Release)",
 				"type": "shell",
-				"command": "dotnet build StardewDS.csproj -c Release \"/p:GamePath=${workspaceFolder:game-refs}/refs\" \"/p:ModZipPath=${workspaceFolder:mod}/../dist/mod/Release\" /p:EnableModDeploy=false",
+				"command": "dotnet build StardewDS.csproj -c Release \"/p:GamePath=${workspaceFolder:mod}/vendor/lib\" /p:EnableModDeploy=false",
 				"options": {
 					"cwd": "${workspaceFolder:mod}"
 				},
@@ -146,7 +146,7 @@
 			{
 				"label": "companion: build apk (debug)",
 				"type": "shell",
-				"command": "mkdir -p \"${workspaceFolder:companion}/../dist/companion\" && flutter build apk --debug && cp \"${workspaceFolder:companion}/build/app/outputs/flutter-apk/app-debug.apk\" \"${workspaceFolder:companion}/../dist/companion/companion-debug.apk\"",
+				"command": "flutter build apk --debug",
 				"options": {
 					"cwd": "${workspaceFolder:companion}"
 				},
@@ -164,7 +164,7 @@
 			{
 				"label": "companion: build apk (release)",
 				"type": "shell",
-				"command": "mkdir -p \"${workspaceFolder:companion}/../dist/companion\" && flutter build apk --release && cp \"${workspaceFolder:companion}/build/app/outputs/flutter-apk/app-release.apk\" \"${workspaceFolder:companion}/../dist/companion/companion-release.apk\"",
+				"command": "flutter build apk --release",
 				"options": {
 					"cwd": "${workspaceFolder:companion}"
 				},
