@@ -5,9 +5,6 @@
 		},
 		{
 			"path": "mod"
-		},
-		{
-			"path": "game-refs"
 		}
 	],
 	"settings": {
