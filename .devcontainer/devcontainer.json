@@ -9,10 +9,20 @@
   	},
 	"workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
   	"workspaceFolder": "/workspace",
+	// --privileged gives the container access to devices attached to the
+	// OrbStack VM (e.g. a phone passed through via Orbstack's USB support).
+	// Passing the device into the VM alone isn't enough - Docker doesn't
+	// forward host/VM devices into a container without this.
+	"runArgs": ["--privileged"],
 	"remoteEnv": {
 		"PATH": "/opt/flutter/bin:/opt/flutter/bin/cache/dart-sdk/bin:${containerEnv:PATH}"
 	},
-	"postCreateCommand": "flutter doctor && dotnet --info",
+	"postCreateCommand": "bash -c 'cd companion && flutter clean && flutter pub get && cd .. && flutter doctor && dotnet --info'",
+	// Runs on every container start, not just creation, so a phone plugged
+	// in after the container is already up still gets picked up. The device
+	// nodes OrbStack creates under /dev/bus/usb land root-owned, so the
+	// plain vscode user can't talk to them without this.
+	"postStartCommand": "sudo chmod -R a+rw /dev/bus/usb 2>/dev/null; sudo adb kill-server 2>/dev/null; adb start-server; true",
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
